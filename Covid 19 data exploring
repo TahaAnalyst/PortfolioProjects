@@ -1,0 +1,119 @@
+select 
+location
+,date
+,total_cases
+,total_deaths
+from Tahadb..CovidDeath
+--where location = 'Sudan'
+order by 1, 2
+
+
+--looking at country had high infection rate 
+select 
+location,population,MAX(total_cases) as high_infection
+
+from Tahadb..CovidDeath
+group by population,location
+order by high_infection desc
+
+--show country with highiest death count population 
+select 
+location,
+MAX(cast (total_deaths as int)) as total_death_count
+From Tahadb..CovidDeath
+where continent is not  null
+group by location
+order by total_death_count desc
+
+
+-- showing the content with high 
+select 
+continent,
+MAX(cast (total_deaths as int)) as total_death_count
+From Tahadb..CovidDeath
+where continent is not  null
+group by continent
+order by total_death_count desc
+
+-- global number
+Select 
+SUM(new_cases) as total_cases
+,sum(cast(new_deaths as int))as total_death
+,SUM(cast(new_deaths as int))/sum(new_cases)*100 as Death_percentage
+from Tahadb..CovidDeath
+where continent is not null 
+--group by date
+order by 1,2
+
+
+-- looking at total population vs vaccination join table death and vaccine
+
+select da.continent,da.location ,da.date , da.population , vac.new_vaccinations
+,SUM(cast(vac.new_vaccinations as bigint)) OVER (partition by da.location order by da.location,da.date) as Rollingpeoplevaccinated
+from Tahadb..CovidDeath  da
+
+join Tahadb..Covidvaccin vac
+
+on da.location=vac.location
+and da.date=vac.date
+where da.continent is not null
+order by 1,2,3
+
+-- CTE temp table 
+with popvsvac (continent, location,date,population,new_vaccinations,Rollingpeoplevaccinated)
+as
+(
+select da.continent,da.location ,da.date , da.population , vac.new_vaccinations
+,SUM(cast(vac.new_vaccinations as bigint)) OVER (partition by da.location order by da.location,da.date) as Rollingpeoplevaccinated
+--,(Rollingpeoplevaccinated/population)*100 
+from Tahadb..CovidDeath  da
+
+join Tahadb..Covidvaccin vac
+
+on da.location=vac.location
+and da.date=vac.date
+where da.continent is not null
+--order by 1,2,3
+)
+select * ,(Rollingpeoplevaccinated/population)*100 as precantage
+from popvsvac
+
+--Temp table creation
+Drop table if exists 
+create table #precantage
+(
+continent nvarchar(255),
+location nvarchar(255),
+date datetime,
+population numeric,
+new_vaccinations numeric,
+Rollingpeoplevaccinated numeric
+)
+insert into #precantage
+select da.continent,da.location ,da.date , da.population , vac.new_vaccinations
+,SUM(cast(vac.new_vaccinations as bigint)) OVER (partition by da.location order by da.location,da.date) as Rollingpeoplevaccinated
+--,(Rollingpeoplevaccinated/population)*100 
+from Tahadb..CovidDeath  da
+
+join Tahadb..Covidvaccin vac
+
+on da.location=vac.location
+and da.date=vac.date
+where da.continent is not null
+--order by 1,2,3
+select * ,(Rollingpeoplevaccinated/population)*100 as precantage
+from #precantage
+
+-- creating view for continent with high death for later visu
+create view percentagepopulationvac1 as
+select da.continent,da.location ,da.date , da.population , vac.new_vaccinations
+,SUM(cast(vac.new_vaccinations as bigint)) OVER (partition by da.location order by da.location,da.date) as Rollingpeoplevaccinated
+--,(Rollingpeoplevaccinated/population)*100 
+from Tahadb..CovidDeath  da
+
+join Tahadb..Covidvaccin vac
+
+on da.location=vac.location
+and da.date=vac.date
+where da.continent is not null
+--order by 1,2,3
